@@ -24,6 +24,7 @@ namespace AuraTracker
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
+        private readonly Dictionary<uint, DpsState> dpsStates = new();
         private ActiveCoroutine onAreaChange;
 
         private string SettingsPath => Path.Join(this.DllDirectory, "config", "AuraTracker.settings.json");
@@ -55,6 +56,7 @@ namespace AuraTracker
             onAreaChange?.Cancel();
             onAreaChange = null;
             smoothPositions.Clear();
+            dpsStates.Clear();
         }
 
         public override void SaveSettings()
@@ -72,8 +74,6 @@ namespace AuraTracker
             {
                 if (ImGui.BeginTable("at_general", 2))
                 {
-                    //ImGui.TableNextColumn(); ImGui.Checkbox("Draw in Town", ref Settings.DrawInTown);
-                    //ImGui.TableNextColumn(); ImGui.Checkbox("Draw in Hideout", ref Settings.DrawInHideout);
 
                     ImGui.TableNextColumn(); ImGui.Checkbox("Draw when game is backgrounded", ref Settings.DrawWhenGameInBackground);
 
@@ -129,7 +129,7 @@ namespace AuraTracker
 
                     ImGui.TableNextColumn(); ImGui.ColorEdit4("ES Fill", ref Settings.BarEsFill);
                     ImGui.TableNextColumn(); ImGui.SetNextItemWidth(180);
-                    ImGui.DragFloat2("Bar Size (w,h)", ref Settings.BarSize, 1f, 80, 600); // width follows panel; Y = height
+                    ImGui.DragFloat2("Bar Size (w,h)", ref Settings.BarSize, 1f, 80, 600);
 
                     ImGui.TableNextColumn(); ImGui.Checkbox("HP Text Shows Percent (instead of absolute)", ref Settings.ShowHpPercent);
 
@@ -143,6 +143,13 @@ namespace AuraTracker
 
                     ImGui.TableNextColumn(); ImGui.SliderFloat("Buff BG Alpha", ref Settings.BuffBgAlpha, 0.0f, 1.0f);
                     ImGui.TableNextColumn(); ImGui.SliderFloat("Buff Text Scale", ref Settings.BuffTextScale, 0.5f, 2.0f);
+
+                    // --- DPS ---
+                    ImGui.TableNextColumn(); ImGui.Checkbox("Show DPS Label", ref Settings.ShowDps);
+                    ImGui.TableNextColumn(); ImGui.SetNextItemWidth(180);
+                    ImGui.DragFloat("DPS Smoothing (s)", ref Settings.DpsSmoothingSeconds, 0.05f, 0.1f, 5f);
+
+                    ImGui.TableNextColumn(); ImGui.ColorEdit4("DPS Text Color", ref Settings.DpsTextColor);
 
                     ImGui.EndTable();
                 }
@@ -171,9 +178,8 @@ namespace AuraTracker
                     ImGui.TableNextColumn(); ImGui.Checkbox("Chip Gloss", ref Settings.FancyChipGloss);
 
                     ImGui.TableNextColumn(); ImGui.SliderFloat("Chip Corner Radius", ref Settings.ChipCornerRadius, 0f, 12f);
-                    ImGui.TableNextColumn(); ImGui.SliderFloat("Chip Shadow Alpha", ref Settings.ChipShadowAlpha, 0f, 1f);
-
                     ImGui.TableNextColumn(); ImGui.SliderFloat("Chip Gloss Alpha", ref Settings.ChipGlossAlpha, 0f, 1f);
+
                     ImGui.EndTable();
                 }
             }
@@ -196,18 +202,12 @@ namespace AuraTracker
 
         public override void DrawUI()
         {
-            if (Core.States.GameCurrentState != GameStateTypes.InGameState &&
-                Core.States.GameCurrentState != GameStateTypes.EscapeState)
-            {
-                return;
-            }
+            if (Core.States.GameCurrentState != GameStateTypes.InGameState) return;
 
             var inGame = Core.States.InGameStateObject;
             var world = inGame.CurrentWorldInstance;
             var area = inGame.CurrentAreaInstance;
 
-            //if (!Settings.DrawInTown && world.AreaDetails.IsTown) return;
-            //if (!Settings.DrawInHideout && world.AreaDetails.IsHideout) return;
             if (!Settings.DrawWhenGameInBackground && !Core.Process.Foreground) return;
             if (inGame.GameUi.SkillTreeNodesUiElements.Count > 0) return;
 
@@ -217,7 +217,7 @@ namespace AuraTracker
             {
                 var e = kv.Value;
 
-                // Validity/state filter
+                // Validity/state filter (and exclude friendly/allied if your build exposes it)
                 if (!e.IsValid || e.EntityState == EntityStates.PinnacleBossHidden || e.EntityState == EntityStates.Useless)
                     continue;
 
@@ -233,6 +233,7 @@ namespace AuraTracker
                 var pos = r.WorldPosition;
                 pos.Z -= r.ModelBounds.Z;
                 var screen = world.WorldToScreen(pos, pos.Z);
+
                 var center = new Vector2(Core.Overlay.Size.Width / 2f, Core.Overlay.Size.Height / 2f);
                 if (Vector2.Distance(screen, center) > Settings.ScreenRangePx)
                     continue;
@@ -240,31 +241,31 @@ namespace AuraTracker
                 // life
                 if (!e.TryGetComponent<Life>(out var life, true)) continue;
 
-                // buffs (cleaned & titleized; hidden removed; stacks aggregated)
+                // buffs
                 var buffs = ExtractBuffs(e, Settings);
 
-                // Precompute display strings (full text) & raw chip metrics now
+                // Precompute chip sizes
                 float rowMaxChipW = 0f;
                 for (int i = 0; i < buffs.Count; i++)
                 {
                     var b = buffs[i];
-                    string disp = ComposeBuffDisplay(b, Settings); // full text with stacks and/or timer
+                    string disp = ComposeBuffDisplay(b, Settings);
                     var sz = MeasureText(disp, Settings.BuffTextScale);
                     b.Display = disp;
-                    b.ChipWidth = sz.X + 8f;    // pill padding
+                    b.ChipWidth = sz.X + 8f;
                     b.ChipHeight = sz.Y + 4f;
                     buffs[i] = b;
                     if (b.ChipWidth > rowMaxChipW) rowMaxChipW = b.ChipWidth;
                 }
 
-                // name from e.Path
+                // name
                 string name = GetMonsterName(e) ?? "Unknown";
                 float nameW = MeasureTextWidth(name, 1.0f);
 
                 candidates.Add((e, screen, life, rarity, buffs, name, nameW, rowMaxChipW));
             }
 
-            // Rarity-prioritized selection (guarantee rarer enemies appear when at max)
+            // Rarity-prioritized selection
             var centerPt = new Vector2(Core.Overlay.Size.Width / 2f, Core.Overlay.Size.Height / 2f);
             var selected = new List<(Entity e, Vector2 screen, Life life, Rarity rarity, List<BuffInfo> buffs, string name, float nameW, float maxChipW)>();
             int slots = Math.Max(0, Settings.MaxEnemies);
@@ -281,11 +282,11 @@ namespace AuraTracker
             candidates = selected;
             if (candidates.Count == 0) return;
 
-            // Panel/content width = PanelWidth (clamped to screen)
+            // Panel width
             float maxW = Core.Overlay.Size.Width - Settings.LeftAnchor.X - Settings.PanelRightSafeMargin;
             float contentW = MathF.Min(MathF.Max(Settings.PanelWidth, 120f), MathF.Max(120f, maxW));
 
-            // Height measurement using final width (chips will wrap/fit accordingly)
+            // Total height prepass
             float totalHeight = 0f;
             float usableMax = Settings.MaxListHeight <= 0 ? Core.Overlay.Size.Height : Settings.MaxListHeight;
             foreach (var row in candidates)
@@ -305,7 +306,7 @@ namespace AuraTracker
 
             var dl = ImGui.GetBackgroundDrawList();
 
-            // Panel background (left anchored) + fancy shadow/stripe
+            // Panel background (with fancy options)
             if (Settings.ShowPanelBackground)
             {
                 var pMin = new Vector2(Settings.LeftAnchor.X - Settings.PanelPadding.X,
@@ -338,30 +339,51 @@ namespace AuraTracker
                 dl.AddRect(pMin, pMax, ImGuiHelper.Color(Settings.PanelBorder), Settings.PanelCornerRadius);
             }
 
-            // Draw entries — left-aligned; bar width ALWAYS follows panel width
+            // Draw entries — left-aligned
             var cursor = Settings.LeftAnchor;
             float drawn = 0f;
             foreach (var row in candidates)
             {
                 float nameH = ImGui.CalcTextSize(row.name).Y;
 
-                // Name (rarity-colored) — ellipsize to content width
+                // Name
                 string nameToDraw = EllipsizeToWidth(row.name, contentW, 1f);
                 dl.AddText(new Vector2(cursor.X, cursor.Y), ImGuiHelper.Color(RarityColor(row.rarity)), nameToDraw);
 
-                // Separator under name for subtle grouping
+                // Separator
                 float sepY = cursor.Y + nameH + 1f;
                 uint sepCol = ImGuiHelper.Color(new Vector4(1, 1, 1, 0.05f));
                 dl.AddLine(new Vector2(Settings.LeftAnchor.X, sepY), new Vector2(Settings.LeftAnchor.X + contentW, sepY), sepCol, 1f);
 
                 cursor.Y += nameH + 2f;
 
-                // Health bar — width = panel width, HP+ES split, fancy look
+                // Health bar
                 var barTopLeft = new Vector2(cursor.X, cursor.Y);
                 DrawBarLeft(dl, barTopLeft, row.life, Settings, contentW);
+
+                // DPS label (right-aligned, vertically centered inside the bar)
+                if (Settings.ShowDps)
+                {
+                    float dps = UpdateAndGetDps(row.e.Id, row.life);
+                    string dpsText = "DPS " + HumanizeNumber((long)MathF.Max(0f, dps));
+                    var sz = ImGui.CalcTextSize(dpsText);
+
+                    // Center vertically using bar height; add small right padding
+                    var pos = new Vector2(
+                        barTopLeft.X + contentW - sz.X - 4f,
+                        barTopLeft.Y + (Settings.BarSize.Y - sz.Y) * 0.5f
+                    );
+
+                    uint shadow = ImGuiHelper.Color(new Vector4(0, 0, 0, 0.80f));
+                    dl.AddText(pos + new Vector2(1, 0), shadow, dpsText);
+                    dl.AddText(pos + new Vector2(0, 1), shadow, dpsText);
+                    dl.AddText(pos, ImGuiHelper.Color(Settings.DpsTextColor), dpsText);
+                }
+
+
                 cursor.Y += Settings.BarSize.Y + Settings.BarToBuffSpacing;
 
-                // cartonized buffs for this width
+                // Buffs
                 var ordered = CartonizeBuffs(row.buffs, contentW, Settings);
                 if (ordered.Count > Settings.MaxBuffsPerEnemy)
                     ordered = ordered.Take(Settings.MaxBuffsPerEnemy).ToList();
@@ -374,7 +396,55 @@ namespace AuraTracker
             }
         }
 
-        // ---------- helpers ----------
+        // ---------- DPS tracking ----------
+
+        private sealed class DpsState
+        {
+            public int LastPool;     // last (HP+ES)
+            public long LastTicks;   // DateTime.UtcNow.Ticks
+            public float Ema;        // smoothed DPS
+        }
+
+        private float UpdateAndGetDps(uint id, Life life)
+        {
+            int hpCur = Math.Max(life.Health.Current, 0);
+            int esCur = Math.Max(life.EnergyShield.Current, 0);
+            int pool = hpCur + esCur;
+
+            long nowTicks = DateTime.UtcNow.Ticks;
+            float dt = 0f;
+
+            if (!dpsStates.TryGetValue(id, out var st))
+            {
+                st = new DpsState { LastPool = pool, LastTicks = nowTicks, Ema = 0f };
+                dpsStates[id] = st;
+                return 0f;
+            }
+
+            dt = MathF.Max(0f, (nowTicks - st.LastTicks) / 10_000_000f); // ticks->seconds
+            st.LastTicks = nowTicks;
+
+            if (dt > 0f)
+            {
+                int delta = st.LastPool - pool; // positive when taking damage
+                st.LastPool = pool;
+
+                float sample = delta > 0 ? delta / dt : 0f;
+
+                // Exponential smoothing with time-constant = Settings.DpsSmoothingSeconds
+                float tau = MathF.Max(0.1f, Settings.DpsSmoothingSeconds);
+                float alpha = 1f - MathF.Exp(-dt / tau);
+
+                // If no damage this frame, decay toward 0 smoothly
+                float target = sample > 0 ? sample : 0f;
+                st.Ema = st.Ema + alpha * (target - st.Ema);
+            }
+
+            dpsStates[id] = st;
+            return st.Ema;
+        }
+
+        // ---------- helpers (unchanged from your polished build) ----------
 
         private static bool TryGetRarity(Entity e, out Rarity rarity)
         {
@@ -393,10 +463,10 @@ namespace AuraTracker
 
         private static Vector4 RarityColor(Rarity r) => r switch
         {
-            Rarity.Normal => new(1f, 1f, 1f, 1f),      // white
-            Rarity.Magic => new(0.3f, 0.6f, 1f, 1f),  // blue
-            Rarity.Rare => new(1f, 1f, 0f, 1f),      // yellow
-            Rarity.Unique => new(1f, 0.5f, 0f, 1f),    // orange
+            Rarity.Normal => new(1f, 1f, 1f, 1f),
+            Rarity.Magic => new(0.3f, 0.6f, 1f, 1f),
+            Rarity.Rare => new(1f, 1f, 0f, 1f),
+            Rarity.Unique => new(1f, 0.5f, 0f, 1f),
             _ => Vector4.One
         };
 
@@ -441,7 +511,7 @@ namespace AuraTracker
 
             string s = raw.Replace('_', ' ');
 
-            string[] drop = { "visual", "visuals", "monster", "mod", "6B", "buff", "magic", "mob", "effect", "effects", "rare", "display", "not", "hidden" };
+            string[] drop = { "visual", "visuals", "monster", "mod", "6B", "buff", "magic", "mob", "effect", "effects", "rare", "display", "not", "hidden", "epk", "rarity" };
             var parts = s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                          .Where(w => !drop.Any(d => string.Equals(w, d, StringComparison.OrdinalIgnoreCase)));
 
@@ -470,18 +540,19 @@ namespace AuraTracker
             string baseName = CleanBuffBase(raw);
             if (baseName == null) return null;
 
+            if (string.Equals(baseName, "hidden", StringComparison.OrdinalIgnoreCase))
+                return null;
+
             return Titleize(baseName);
         }
 
         private static string ComposeBuffDisplay(BuffInfo b, AuraTrackerSettings s)
         {
-            // stack suffix, then optional duration
             string stack = b.Stacks > 1 ? $" x{b.Stacks}" : "";
             string dur = (s.ShowDurations && b.DurationSeconds.HasValue) ? $" ({b.DurationSeconds.Value:0.#}s)" : "";
             return b.Name + stack + dur;
         }
 
-        // --- Fit helpers (ensure suffix stays visible, no spill) ---
         private static (string text, float width, float height) FitChipToWidth(BuffInfo b, float rowWidth, AuraTrackerSettings s)
         {
             string stackSuffix = b.Stacks > 1 ? $" x{b.Stacks}" : "";
@@ -562,7 +633,6 @@ namespace AuraTracker
                     tallestRow = 0f;
                 }
 
-                // Stable color: hash from base name ONLY (no stacks/timer)
                 Vector4 baseCol = HashToColor(b.Name, s.BuffBgAlpha);
                 uint fill = ImGuiHelper.Color(baseCol);
                 uint border = ImGuiHelper.Color(new Vector4(baseCol.X * .55f, baseCol.Y * .55f, baseCol.Z * .55f, 0.9f));
@@ -600,7 +670,6 @@ namespace AuraTracker
             return totalHeight;
         }
 
-        // Cartonizer (best-fit decreasing by chip width)
         private sealed class ChipRow { public readonly List<BuffInfo> Items = new(); public float Used; }
 
         private static List<BuffInfo> CartonizeBuffs(List<BuffInfo> buffs, float rowWidth, AuraTrackerSettings s)
@@ -648,7 +717,6 @@ namespace AuraTracker
             return rows.SelectMany(r => r.Items).ToList();
         }
 
-        // Bar is left-aligned; width ALWAYS = panel width; HP+ES split; fancy look; label centered
         private static void DrawBarLeft(ImDrawListPtr dl, Vector2 topLeft, Life life, AuraTrackerSettings s, float contentW)
         {
             float barW = contentW;
@@ -656,7 +724,7 @@ namespace AuraTracker
             var end = start + new Vector2(barW, s.BarSize.Y);
             float r = s.BarCornerRadius;
 
-            // Background (rounded)
+            // Background
             dl.AddRectFilled(start, end, ImGuiHelper.Color(s.BarBg), r);
 
             int hpCur = Math.Max(life.Health.Current, 0);
@@ -689,7 +757,6 @@ namespace AuraTracker
                 var esFlag = (hpW <= 0.5f ? ImDrawFlags.RoundCornersLeft : ImDrawFlags.None) | ImDrawFlags.RoundCornersRight;
                 dl.AddRectFilled(esStart, esEnd, ImGuiHelper.Color(s.BarEsFill), r, esFlag);
 
-                // ES divider line at the junction (optional)
                 if (s.FancyEsDivider && hpW > 0.5f)
                 {
                     var x = start.X + hpW;
@@ -705,7 +772,7 @@ namespace AuraTracker
                 dl.AddRect(start, end, borderCol, r);
             }
 
-            // Gloss pass (top gradient)
+            // Gloss pass
             if (s.FancyBarGloss)
             {
                 float h = s.BarSize.Y;
@@ -718,7 +785,7 @@ namespace AuraTracker
                 );
             }
 
-            // Label (centered)
+            // Centered HP/ES label
             float pct = poolCur / (float)poolMax;
             string label = s.ShowHpPercent ? $"{(int)(pct * 100f)}%" : Humanize(poolCur);
             var sz = ImGui.CalcTextSize(label);
@@ -737,8 +804,17 @@ namespace AuraTracker
 
         private static string Humanize(int v)
         {
+            if (v >= 1_000_000_000) return $"{v / 1_000_000_000f:0.##}B";
             if (v >= 1_000_000) return $"{v / 1_000_000f:0.##}M";
             if (v >= 1_000) return $"{v / 1_000f:0.#}K";
+            return v.ToString();
+        }
+
+        private static string HumanizeNumber(long v)
+        {
+            if (v >= 1_000_000_000L) return $"{v / 1_000_000_000f:0.##}B";
+            if (v >= 1_000_000L) return $"{v / 1_000_000f:0.##}M";
+            if (v >= 1_000L) return $"{v / 1_000f:0.#}K";
             return v.ToString();
         }
 
@@ -800,7 +876,6 @@ namespace AuraTracker
 
         private static List<BuffInfo> ExtractBuffs(Entity e, AuraTrackerSettings s)
         {
-            // Aggregate by cleaned name: sum stacks, keep max finite duration
             var map = new Dictionary<string, (int stacks, float? dur)>();
 
             try
@@ -859,17 +934,18 @@ namespace AuraTracker
             {
                 yield return new Wait(RemoteEvents.AreaChanged);
                 smoothPositions.Clear();
+                dpsStates.Clear();
             }
         }
 
         private struct BuffInfo
         {
-            public string Name;              // cleaned + titleized (stable color key)
-            public int Stacks;            // >= 1
-            public float? DurationSeconds;   // finite only, else null
-            public string Display;           // full text to render before fitting
-            public float ChipWidth;         // measured with scale, including padding
-            public float ChipHeight;        // measured with scale, including padding
+            public string Name;
+            public int Stacks;
+            public float? DurationSeconds;
+            public string Display;
+            public float ChipWidth;
+            public float ChipHeight;
         }
     }
 }

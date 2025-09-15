@@ -16,7 +16,7 @@ namespace AuraTracker
         public Rarity MinRarityToShow = Rarity.Magic;
 
         // Left list anchor & spacing (requested defaults)
-        public Vector2 LeftAnchor = new(250f, 120f);
+        public Vector2 LeftAnchor = new(350f, 250f);
         public float EntrySpacing = 16f;
         public float BarToBuffSpacing = 3f;
         public float MaxListHeight = 0f; // 0 = use overlay height
@@ -65,5 +65,10 @@ namespace AuraTracker
         public float BuffBgAlpha = 0.35f;
         public float BuffTextScale = 1.0f;
         public bool ShowDurations = true; // finite only; indefinite/infinite hidden
+
+        // DPS overlay
+        public bool ShowDps = true;
+        public float DpsSmoothingSeconds = 0.7f;
+        public Vector4 DpsTextColor = new(1f, 1f, 0.6f, 1f); // soft yellow-white
     }
 }
