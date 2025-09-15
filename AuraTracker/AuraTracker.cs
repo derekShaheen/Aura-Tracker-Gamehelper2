@@ -265,22 +265,37 @@ namespace AuraTracker
                 candidates.Add((e, screen, life, rarity, buffs, name, nameW, rowMaxChipW));
             }
 
+            // Hard-dedupe by entity id in case AwakeEntities or path aliasing yields repeats.
+            candidates = candidates
+                .GroupBy(t => t.e.Id)
+                .Select(g => g.First())
+                .ToList();
+
             // Rarity-prioritized selection
             var centerPt = new Vector2(Core.Overlay.Size.Width / 2f, Core.Overlay.Size.Height / 2f);
             var selected = new List<(Entity e, Vector2 screen, Life life, Rarity rarity, List<BuffInfo> buffs, string name, float nameW, float maxChipW)>();
+            var usedIds = new HashSet<uint>();
             int slots = Math.Max(0, Settings.MaxEnemies);
             Rarity[] order = { Rarity.Unique, Rarity.Rare, Rarity.Magic, Rarity.Normal };
+
             foreach (var rr in order)
             {
                 if (slots <= 0) break;
-                var bucket = candidates.Where(t => t.rarity == rr)
-                                       .OrderBy(t => Vector2.Distance(t.screen, centerPt))
-                                       .Take(slots).ToList();
-                selected.AddRange(bucket);
-                slots -= bucket.Count;
+
+                // closest first within this rarity, skipping already used ids
+                foreach (var item in candidates.Where(t => t.rarity == rr)
+                                               .OrderBy(t => Vector2.Distance(t.screen, centerPt)))
+                {
+                    if (slots <= 0) break;
+                    if (!usedIds.Add(item.e.Id)) continue;   // skip duplicate entity
+                    selected.Add(item);
+                    slots--;
+                }
             }
+
             candidates = selected;
             if (candidates.Count == 0) return;
+
 
             // Panel width
             float maxW = Core.Overlay.Size.Width - Settings.LeftAnchor.X - Settings.PanelRightSafeMargin;
