@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ClickableTransparentOverlay">
+      <HintPath>E:\Games\exile2\ClickableTransparentOverlay.dll</HintPath>
+    </Reference>
+    <Reference Include="Coroutine">
+      <HintPath>E:\Games\exile2\Coroutine.dll</HintPath>
+    </Reference>
+    <Reference Include="GameHelper">
+      <HintPath>E:\Games\exile2\GameHelper.dll</HintPath>
+    </Reference>
+    <Reference Include="GameOffsets">
+      <HintPath>E:\Games\exile2\GameOffsets.dll</HintPath>
+    </Reference>
+    <Reference Include="ImGui.NET">
+      <HintPath>E:\Games\exile2\ImGui.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>E:\Games\exile2\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
