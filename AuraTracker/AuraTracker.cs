@@ -208,7 +208,7 @@ namespace AuraTracker
             ImGui.Separator();
 
             // Center the version label in the settings panel
-            string verLabel = $"AuraTracker v{PluginVersion}";
+            string verLabel = $"AuraTracker v{PluginVersion} by Skrip";
             float txtW = ImGui.CalcTextSize(verLabel).X;
             float availW = ImGui.GetContentRegionAvail().X;
             float padX = MathF.Max(0f, (availW - txtW) * 0.5f);
