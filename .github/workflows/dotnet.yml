@@ -1,0 +1,81 @@
+name: Build and Deploy (minimal zip)
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PLUGIN_NAME: AuraTracker
+  PROJECT_FILE: AuraTracker/AuraTracker.csproj
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Resolve build version from tag
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v',''
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          dotnet restore "$env:PROJECT_FILE"
+
+      - name: Build (Release) to known folder
+        shell: pwsh
+        run: |
+          $referencePath = Join-Path $pwd "libs"
+          dotnet build `
+            "$env:PROJECT_FILE" `
+            -c Release `
+            --no-restore `
+            -p:Version=$env:VERSION `
+            -p:ContinuousIntegrationBuild=true `
+            -p:Deterministic=true `
+            -p:ReferencePath="$referencePath" `
+            -o build
+
+      - name: Stage files under AuraTracker/
+        shell: pwsh
+        run: |
+          $dll = Join-Path "build" ("$env:PLUGIN_NAME.dll")
+          $pdb = Join-Path "build" ("$env:PLUGIN_NAME.pdb")
+          if (-not (Test-Path $dll)) { throw "$dll not found" }
+
+          $destDir = Join-Path "package" $env:PLUGIN_NAME
+          New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+
+          Copy-Item -Path $dll -Destination $destDir -Force
+          if (Test-Path $pdb) { Copy-Item -Path $pdb -Destination $destDir -Force }
+
+          Write-Host "Packaged contents:"
+          Get-ChildItem -Recurse package | ForEach-Object { $_.FullName }
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $zipName = "$env:PLUGIN_NAME-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "package/*" -DestinationPath $zipName -Force
+          "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ env.PLUGIN_NAME }}-${{ github.ref_name }}
+          files: ${{ github.workspace }}/${{ env.ZIP_NAME }}
+          generate_release_notes: true

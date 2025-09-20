@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove=".github\**" />
+    <EmbeddedResource Remove=".github\**" />
+    <None Remove=".github\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="ClickableTransparentOverlay">
       <HintPath>E:\Games\exile2\ClickableTransparentOverlay.dll</HintPath>
     </Reference>
