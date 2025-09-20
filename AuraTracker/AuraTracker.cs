@@ -23,7 +23,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.1";
+        private const string PluginVersion = "1.3.2";
 
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
