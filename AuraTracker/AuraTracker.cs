@@ -311,7 +311,8 @@ namespace AuraTracker
                 if (slots <= 0) break;
 
                 foreach (var item in candidates.Where(t => t.rarity == rr)
-                                               .OrderBy(t => Vector2.Distance(t.screen, centerPt)))
+                                               //.OrderBy(t => Vector2.Distance(t.screen, centerPt)))
+                                               .OrderBy(t => t.e.Id))
                 {
                     if (slots <= 0) break;
                     if (!usedIds.Add(item.e.Id)) continue;
