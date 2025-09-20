@@ -626,14 +626,14 @@ namespace AuraTracker
         private static string ComposeBuffDisplay(BuffInfo b, AuraTrackerSettings s)
         {
             string stack = b.Stacks > 1 ? $" x{b.Stacks}" : "";
-            string dur = (s.ShowDurations && b.DurationSeconds.HasValue) ? $" ({b.DurationSeconds.Value:0.#}s)" : "";
+            string dur = (s.ShowDurations && b.DurationSeconds.HasValue) ? $" ({b.DurationSeconds.Value:0}s)" : "";
             return b.Name + stack + dur;
         }
 
         private static (string text, float width, float height) FitChipToWidth(BuffInfo b, float rowWidth, AuraTrackerSettings s)
         {
             string stackSuffix = b.Stacks > 1 ? $" x{b.Stacks}" : "";
-            string durSuffix = (s.ShowDurations && b.DurationSeconds.HasValue) ? $" ({b.DurationSeconds.Value:0.#}s)" : "";
+            string durSuffix = (s.ShowDurations && b.DurationSeconds.HasValue) ? $" ({b.DurationSeconds.Value:0}s)" : "";
             string suffix = stackSuffix + durSuffix;
 
             string baseName = b.Name;
