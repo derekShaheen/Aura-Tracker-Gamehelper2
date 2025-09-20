@@ -68,6 +68,7 @@ namespace AuraTracker
 
         // DPS overlay
         public bool ShowDps = true;
+        public bool ShowOverallDps = true;
         public float DpsSmoothingSeconds = 0.7f;
         public Vector4 DpsTextColor = new(1f, 1f, 0.6f, 1f); // soft yellow-white
     }

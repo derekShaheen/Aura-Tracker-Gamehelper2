@@ -153,6 +153,9 @@ namespace AuraTracker
 
                     ImGui.TableNextColumn(); ImGui.ColorEdit4("DPS Text Color", ref Settings.DpsTextColor);
 
+                    // NEW: Overall DPS header toggle
+                    ImGui.TableNextColumn(); ImGui.Checkbox("Show Overall DPS Header", ref Settings.ShowOverallDps);
+
                     ImGui.EndTable();
                 }
             }
@@ -218,7 +221,7 @@ namespace AuraTracker
 
         public override void DrawUI()
         {
-            if (Core.States.GameCurrentState != GameStateTypes.InGameState) return;
+            if (Core.States.GameCurrentState != GameStateTypes.InGameState && Core.States.GameCurrentState != GameStateTypes.EscapeState) return;
 
             var inGame = Core.States.InGameStateObject;
             var world = inGame.CurrentWorldInstance;
@@ -233,14 +236,14 @@ namespace AuraTracker
             {
                 var e = kv.Value;
 
-                // Validity/state filter (and exclude friendly/allied if your build exposes it)
+                // Validity/state filter (and exclude friendlies)
                 if (!e.IsValid || e.EntityState == EntityStates.PinnacleBossHidden || e.EntityState == EntityStates.Useless || e.EntityState == EntityStates.MonsterFriendly)
                     continue;
 
                 if (e.EntityType != EntityTypes.Monster) continue;
 
                 if (e.EntitySubtype == EntitySubtypes.PlayerOther || e.EntitySubtype == EntitySubtypes.PlayerSelf) continue;
-                
+
                 // rarity
                 if (!TryGetRarity(e, out Rarity rarity)) continue;
                 if (rarity < Settings.MinRarityToShow) continue;
@@ -283,7 +286,7 @@ namespace AuraTracker
                 candidates.Add((e, screen, life, rarity, buffs, name, nameW, rowMaxChipW));
             }
 
-            // Hard-dedupe by entity id in case AwakeEntities or path aliasing yields repeats.
+            // Hard-dedupe by entity id.
             candidates = candidates
                 .GroupBy(t => t.e.Id)
                 .Select(g => g.First())
@@ -300,12 +303,11 @@ namespace AuraTracker
             {
                 if (slots <= 0) break;
 
-                // closest first within this rarity, skipping already used ids
                 foreach (var item in candidates.Where(t => t.rarity == rr)
                                                .OrderBy(t => Vector2.Distance(t.screen, centerPt)))
                 {
                     if (slots <= 0) break;
-                    if (!usedIds.Add(item.e.Id)) continue;   // skip duplicate entity
+                    if (!usedIds.Add(item.e.Id)) continue;
                     selected.Add(item);
                     slots--;
                 }
@@ -314,14 +316,37 @@ namespace AuraTracker
             candidates = selected;
             if (candidates.Count == 0) return;
 
+            // Precompute DPS (once) so we can draw a header and reuse per-row without double-sampling.
+            var dpsMap = new Dictionary<uint, float>(candidates.Count);
+            float totalDps = 0f;
+            foreach (var row in candidates)
+            {
+                float d = UpdateAndGetDps(row.e.Id, row.life);
+                dpsMap[row.e.Id] = d;
+                totalDps += MathF.Max(0f, d);
+            }
 
             // Panel width
             float maxW = Core.Overlay.Size.Width - Settings.LeftAnchor.X - Settings.PanelRightSafeMargin;
             float contentW = MathF.Min(MathF.Max(Settings.PanelWidth, 120f), MathF.Max(120f, maxW));
 
+            // Optional header?
+            bool showHeader = Settings.ShowOverallDps && candidates.Count >= 2;
+            float headerH = 0f;
+            string headerText = "";
+            if (showHeader)
+            {
+                headerText = "TOTAL DPS " + HumanizeNumber((long)totalDps) + " ";
+                headerH = ImGui.CalcTextSize(headerText).Y + 2f; // + small spacing
+            }
+
             // Total height prepass
             float totalHeight = 0f;
             float usableMax = Settings.MaxListHeight <= 0 ? Core.Overlay.Size.Height : Settings.MaxListHeight;
+
+            // include header height if shown
+            totalHeight += showHeader ? headerH : 0f;
+
             foreach (var row in candidates)
             {
                 var ordered = CartonizeBuffs(row.buffs, contentW, Settings);
@@ -372,8 +397,29 @@ namespace AuraTracker
                 dl.AddRect(pMin, pMax, ImGuiHelper.Color(Settings.PanelBorder), Settings.PanelCornerRadius);
             }
 
-            // Draw entries — left-aligned
+            // Draw header (if enabled and 2+ rows)
             var cursor = Settings.LeftAnchor;
+            if (showHeader)
+            {
+                // Right-align the TOTAL DPS header within the content area
+                var hdrSz = ImGui.CalcTextSize(headerText);
+                var pos = new Vector2(Settings.LeftAnchor.X + contentW - hdrSz.X, cursor.Y);
+
+                uint shadow = ImGuiHelper.Color(new Vector4(0, 0, 0, 0.80f));
+                dl.AddText(pos + new Vector2(1, 0), shadow, headerText);
+                dl.AddText(pos + new Vector2(0, 1), shadow, headerText);
+                dl.AddText(pos, ImGuiHelper.Color(Settings.DpsTextColor), headerText);
+
+                // Divider under header (still spans full width)
+                float sepY = cursor.Y + hdrSz.Y + 1f;
+                uint sepCol = ImGuiHelper.Color(new Vector4(1, 1, 1, 0.08f));
+                dl.AddLine(new Vector2(Settings.LeftAnchor.X, sepY), new Vector2(Settings.LeftAnchor.X + contentW, sepY), sepCol, 1f);
+
+                cursor.Y += headerH;
+            }
+
+
+            // Draw entries — left-aligned
             float drawn = 0f;
             foreach (var row in candidates)
             {
@@ -397,11 +443,10 @@ namespace AuraTracker
                 // DPS label (right-aligned, vertically centered inside the bar)
                 if (Settings.ShowDps)
                 {
-                    float dps = UpdateAndGetDps(row.e.Id, row.life);
+                    float dps = dpsMap.TryGetValue(row.e.Id, out var d) ? d : 0f;
                     string dpsText = "DPS " + HumanizeNumber((long)MathF.Max(0f, dps));
                     var sz = ImGui.CalcTextSize(dpsText);
 
-                    // Center vertically using bar height; add small right padding
                     var pos = new Vector2(
                         barTopLeft.X + contentW - sz.X - 4f,
                         barTopLeft.Y + (Settings.BarSize.Y - sz.Y) * 0.5f
@@ -412,7 +457,6 @@ namespace AuraTracker
                     dl.AddText(pos + new Vector2(0, 1), shadow, dpsText);
                     dl.AddText(pos, ImGuiHelper.Color(Settings.DpsTextColor), dpsText);
                 }
-
 
                 cursor.Y += Settings.BarSize.Y + Settings.BarToBuffSpacing;
 
@@ -425,7 +469,7 @@ namespace AuraTracker
 
                 cursor.Y += usedBuff + Settings.EntrySpacing;
                 drawn += nameH + 2f + Settings.BarSize.Y + Settings.BarToBuffSpacing + usedBuff + Settings.EntrySpacing;
-                if (Settings.LeftAnchor.Y + drawn > usableMax) break;
+                if (Settings.LeftAnchor.Y + (showHeader ? headerH : 0f) + drawn > usableMax) break;
             }
         }
 
