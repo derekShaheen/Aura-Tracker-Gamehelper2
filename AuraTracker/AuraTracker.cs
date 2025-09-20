@@ -234,11 +234,13 @@ namespace AuraTracker
                 var e = kv.Value;
 
                 // Validity/state filter (and exclude friendly/allied if your build exposes it)
-                if (!e.IsValid || e.EntityState == EntityStates.PinnacleBossHidden || e.EntityState == EntityStates.Useless)
+                if (!e.IsValid || e.EntityState == EntityStates.PinnacleBossHidden || e.EntityState == EntityStates.Useless || e.EntityState == EntityStates.MonsterFriendly)
                     continue;
 
                 if (e.EntityType != EntityTypes.Monster) continue;
 
+                if (e.EntitySubtype == EntitySubtypes.PlayerOther || e.EntitySubtype == EntitySubtypes.PlayerSelf) continue;
+                
                 // rarity
                 if (!TryGetRarity(e, out Rarity rarity)) continue;
                 if (rarity < Settings.MinRarityToShow) continue;
