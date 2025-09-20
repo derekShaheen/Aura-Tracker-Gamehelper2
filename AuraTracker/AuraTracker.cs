@@ -23,7 +23,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.3";
+        private const string PluginVersion = "1.3.4";
 
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
@@ -583,10 +583,14 @@ namespace AuraTracker
                 if (spaced.Length > 0 && char.IsLetter(spaced[0]))
                     spaced = char.ToUpperInvariant(spaced[0]) + (spaced.Length > 1 ? spaced[1..] : "");
 
+                // strip trailing number(s)
+                spaced = Regex.Replace(spaced, @"\s*\d+$", "").Trim();
+
                 return spaced;
             }
             catch { return null; }
         }
+
 
         private static string CleanBuffBase(string raw)
         {
