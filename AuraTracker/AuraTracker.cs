@@ -23,7 +23,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.4";
+        private const string PluginVersion = "1.3.5";
 
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
@@ -370,7 +370,7 @@ namespace AuraTracker
             }
             if (totalHeight <= 0f) return;
 
-            var dl = ImGui.GetBackgroundDrawList();
+            var dl = ImGui.GetForegroundDrawList();
 
             // Panel background (with fancy options)
             if (Settings.ShowPanelBackground)
