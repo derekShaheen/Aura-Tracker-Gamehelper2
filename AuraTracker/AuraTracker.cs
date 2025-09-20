@@ -23,7 +23,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.5";
+        private const string PluginVersion = "1.3.6";
 
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
@@ -311,8 +311,7 @@ namespace AuraTracker
                 if (slots <= 0) break;
 
                 foreach (var item in candidates.Where(t => t.rarity == rr)
-                                               //.OrderBy(t => Vector2.Distance(t.screen, centerPt)))
-                                               .OrderBy(t => t.e.Id))
+                                               .OrderBy(t => Vector2.Distance(t.screen, centerPt)))
                 {
                     if (slots <= 0) break;
                     if (!usedIds.Add(item.e.Id)) continue;
@@ -321,7 +320,10 @@ namespace AuraTracker
                 }
             }
 
-            candidates = selected;
+            candidates = selected
+                            .OrderByDescending(t => t.rarity) // Unique(3), Rare(2), Magic(1), Normal(0)
+                            .ThenBy(t => t.e.Id)
+                            .ToList();
             if (candidates.Count == 0) return;
 
             // Precompute DPS (once) so we can draw a header and reuse per-row without double-sampling.
