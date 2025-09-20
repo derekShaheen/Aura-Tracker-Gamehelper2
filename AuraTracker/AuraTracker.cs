@@ -23,7 +23,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.2";
+        private const string PluginVersion = "1.3.3";
 
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
@@ -231,6 +231,7 @@ namespace AuraTracker
             if (inGame.GameUi.SkillTreeNodesUiElements.Count > 0) return;
 
             var candidates = new List<(Entity e, Vector2 screen, Life life, Rarity rarity, List<BuffInfo> buffs, string name, float nameW, float maxChipW)>();
+            var seenPathWorld = new HashSet<string>();
 
             foreach (var kv in area.AwakeEntities)
             {
@@ -250,6 +251,12 @@ namespace AuraTracker
 
                 // Render → screen for proximity
                 if (!e.TryGetComponent<Render>(out var r, true)) continue;
+
+                var worldRaw = r.WorldPosition;
+                string pathKey = e.Path ?? "";
+                string key = $"{pathKey}|{BitConverter.SingleToInt32Bits(worldRaw.X)},{BitConverter.SingleToInt32Bits(worldRaw.Y)},{BitConverter.SingleToInt32Bits(worldRaw.Z)}";
+                if (!seenPathWorld.Add(key))
+                    continue;
 
                 var pos = r.WorldPosition;
                 pos.Z -= r.ModelBounds.Z;
