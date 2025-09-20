@@ -23,6 +23,8 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
+        private const string PluginVersion = "1.3.0";
+
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
         private ActiveCoroutine onAreaChange;
@@ -198,6 +200,20 @@ namespace AuraTracker
                     ImGui.EndTable();
                 }
             }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+
+            // Center the version label in the settings panel
+            string verLabel = $"AuraTracker v{PluginVersion}";
+            float txtW = ImGui.CalcTextSize(verLabel).X;
+            float availW = ImGui.GetContentRegionAvail().X;
+            float padX = MathF.Max(0f, (availW - txtW) * 0.5f);
+            float curX = ImGui.GetCursorPosX();
+            ImGui.SetCursorPosX(curX + padX);
+
+            // Slightly muted look
+            ImGui.TextDisabled(verLabel);
         }
 
         public override void DrawUI()
