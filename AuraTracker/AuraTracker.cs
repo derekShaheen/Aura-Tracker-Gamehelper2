@@ -23,7 +23,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.6";
+        private const string PluginVersion = "1.3.7";
 
         private readonly Dictionary<uint, Vector2> smoothPositions = new();
         private readonly Dictionary<uint, DpsState> dpsStates = new();
@@ -69,9 +69,6 @@ namespace AuraTracker
 
         public override void DrawSettings()
         {
-            ImGui.Text("AuraTracker — rarity-prioritized enemy list with buffs, fixed left panel.");
-            ImGui.Separator();
-
             if (ImGui.CollapsingHeader("General"))
             {
                 if (ImGui.BeginTable("at_general", 2))
@@ -126,6 +123,12 @@ namespace AuraTracker
             {
                 if (ImGui.BeginTable("at_bar", 2))
                 {
+                    ImGui.TableNextColumn(); ImGui.DragInt("Chip Color Seed", ref Settings.ChipColorSeed, 1, 0, 1000);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Set the seed used for randomizing buff chip background colors.\nSame seed yields same color mapping each launch.");
+                    }
+
                     ImGui.TableNextColumn(); ImGui.ColorEdit4("Bar Background", ref Settings.BarBg);
                     ImGui.TableNextColumn(); ImGui.ColorEdit4("HP Fill", ref Settings.BarHpFill);
 
@@ -141,7 +144,7 @@ namespace AuraTracker
                     ImGui.TableNextColumn(); ImGui.SetNextItemWidth(180);
                     ImGui.DragInt("Max Buffs/Enemy", ref Settings.MaxBuffsPerEnemy, 1f, 1, 30);
 
-                    ImGui.TableNextColumn(); ImGui.Checkbox("Show Buff Durations (finite only)", ref Settings.ShowDurations);
+                    ImGui.TableNextColumn(); ImGui.Checkbox("Show Buff Durations", ref Settings.ShowDurations);
 
                     ImGui.TableNextColumn(); ImGui.SliderFloat("Buff BG Alpha", ref Settings.BuffBgAlpha, 0.0f, 1.0f);
                     ImGui.TableNextColumn(); ImGui.SliderFloat("Buff Text Scale", ref Settings.BuffTextScale, 0.5f, 2.0f);
@@ -428,7 +431,6 @@ namespace AuraTracker
                 cursor.Y += headerH;
             }
 
-
             // Draw entries — left-aligned
             float drawn = 0f;
             foreach (var row in candidates)
@@ -631,9 +633,6 @@ namespace AuraTracker
             string baseName = CleanBuffBase(raw);
             if (baseName == null) return null;
 
-            if (string.Equals(baseName, "hidden", StringComparison.OrdinalIgnoreCase))
-                return null;
-
             return Titleize(baseName);
         }
 
@@ -724,7 +723,7 @@ namespace AuraTracker
                     tallestRow = 0f;
                 }
 
-                Vector4 baseCol = HashToColor(b.Name, s.BuffBgAlpha);
+                Vector4 baseCol = HashToColor(b.Name, s.BuffBgAlpha, s.ChipColorSeed);
                 uint fill = ImGuiHelper.Color(baseCol);
                 uint border = ImGuiHelper.Color(new Vector4(baseCol.X * .55f, baseCol.Y * .55f, baseCol.Z * .55f, 0.9f));
 
@@ -941,9 +940,14 @@ namespace AuraTracker
             return best;
         }
 
-        private static Vector4 HashToColor(string s, float alpha)
+        private static Vector4 HashToColor(string s, float alpha, int seed)
         {
             uint h = 2166136261;
+            unchecked
+            {
+                h ^= (uint)seed;
+                h *= 16777619;
+            }
             foreach (char c in s.ToUpperInvariant())
             {
                 h ^= c;

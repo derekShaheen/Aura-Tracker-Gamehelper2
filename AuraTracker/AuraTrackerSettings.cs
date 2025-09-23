@@ -10,7 +10,9 @@ namespace AuraTracker
         public bool DrawWhenGameInBackground = false;
 
         public float ScreenRangePx = 1800;    // “nearby” in screen space
-        public int MaxEnemies = 8;
+        public int MaxEnemies = 5;
+
+        public int ChipColorSeed = 0;
 
         // Show this rarity and above
         public Rarity MinRarityToShow = Rarity.Magic;
@@ -68,7 +70,7 @@ namespace AuraTracker
 
         // DPS overlay
         public bool ShowDps = true;
-        public bool ShowOverallDps = true;
+        public bool ShowOverallDps = false;
         public float DpsSmoothingSeconds = 0.7f;
         public Vector4 DpsTextColor = new(1f, 1f, 0.6f, 1f); // soft yellow-white
     }
