@@ -73,5 +73,17 @@ namespace AuraTracker
         public bool ShowOverallDps = false;
         public float DpsSmoothingSeconds = 0.7f;
         public Vector4 DpsTextColor = new(1f, 1f, 0.6f, 1f); // soft yellow-white
+
+        public sealed class ChipColorOverride
+        {
+            // Match against the chip base text
+            public string Match = "";
+            // RGB is respected; alpha is ignored so global BuffBgAlpha still applies
+            public Vector4 Color = new(1f, 1f, 1f, 1f);
+        }
+
+        // User-defined overrides
+        public List<ChipColorOverride> ChipOverrides = new();
+
     }
 }

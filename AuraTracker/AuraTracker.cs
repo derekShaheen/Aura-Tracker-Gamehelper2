@@ -123,12 +123,6 @@ namespace AuraTracker
             {
                 if (ImGui.BeginTable("at_bar", 2))
                 {
-                    ImGui.TableNextColumn(); ImGui.DragInt("Chip Color Seed", ref Settings.ChipColorSeed, 1, 0, 1000);
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("Set the seed used for randomizing buff chip background colors.\nSame seed yields same color mapping each launch.");
-                    }
-
                     ImGui.TableNextColumn(); ImGui.ColorEdit4("Bar Background", ref Settings.BarBg);
                     ImGui.TableNextColumn(); ImGui.ColorEdit4("HP Fill", ref Settings.BarHpFill);
 
@@ -163,7 +157,67 @@ namespace AuraTracker
                 }
             }
 
-            if (ImGui.CollapsingHeader("Fancy Visuals"))
+            if (ImGui.CollapsingHeader("Chip Color Overrides"))
+            {
+                ImGui.TableNextColumn(); ImGui.SetNextItemWidth(150); 
+                ImGui.DragInt("Chip Color Seed", ref Settings.ChipColorSeed, 1, 0, 1000);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("Set the seed used for randomizing buff chip background colors.\nSame seed yields same color mapping each launch.");
+                }
+
+                ImGui.TextWrapped("Add entries that match the chip's base text (without stacks or timer), e.g. \"Archnemesis\". The specified color overrides the random chip color. Alpha is ignored.");
+
+                // List editor
+                for (int i = 0; i < Settings.ChipOverrides.Count; i++)
+                {
+                    var item = Settings.ChipOverrides[i];
+                    ImGui.PushID(i);
+
+                    // Row
+                    if (ImGui.BeginTable("ovr_row", 3, ImGuiTableFlags.SizingStretchProp))
+                    {
+                        ImGui.TableSetupColumn("Text", ImGuiTableColumnFlags.WidthStretch);
+                        ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 180);
+                        ImGui.TableSetupColumn("Del", ImGuiTableColumnFlags.WidthFixed, 60);
+
+                        ImGui.TableNextColumn();
+                        ImGui.SetNextItemWidth(-1);
+                        var match = item.Match ?? "";
+                        if (ImGui.InputText("##txt", ref match, 256))
+                            item.Match = match;
+
+                        ImGui.TableNextColumn();
+                        // show/edit only RGB; keep alpha implicit
+                        var rgb = new Vector3(item.Color.X, item.Color.Y, item.Color.Z);
+                        if (ImGui.ColorEdit3("##col", ref rgb, ImGuiColorEditFlags.NoInputs))
+                        {
+                            item.Color = new Vector4(rgb.X, rgb.Y, rgb.Z, 1f); // keep A = 1, alpha not used
+                        }
+
+                        ImGui.TableNextColumn();
+                        if (ImGui.Button("Remove"))
+                        {
+                            Settings.ChipOverrides.RemoveAt(i);
+                            ImGui.EndTable();
+                            ImGui.PopID();
+                            i--;
+                            continue;
+                        }
+
+                        ImGui.EndTable();
+                    }
+
+                    ImGui.PopID();
+                }
+
+                if (ImGui.Button("Add Override"))
+                {
+                    Settings.ChipOverrides.Add(new AuraTrackerSettings.ChipColorOverride { Match = "", Color = new Vector4(1, 1, 1, 1) });
+                }
+            }
+
+            if (ImGui.CollapsingHeader("Visuals"))
             {
                 if (ImGui.BeginTable("at_fx", 2))
                 {
@@ -723,7 +777,11 @@ namespace AuraTracker
                     tallestRow = 0f;
                 }
 
-                Vector4 baseCol = HashToColor(b.Name, s.BuffBgAlpha, s.ChipColorSeed);
+                Vector4 baseCol;
+                if (!TryGetOverrideColor(b.Name, s, out baseCol))
+                {
+                    baseCol = HashToColor(b.Name, s.BuffBgAlpha, s.ChipColorSeed);
+                }
                 uint fill = ImGuiHelper.Color(baseCol);
                 uint border = ImGuiHelper.Color(new Vector4(baseCol.X * .55f, baseCol.Y * .55f, baseCol.Z * .55f, 0.9f));
 
@@ -956,6 +1014,25 @@ namespace AuraTracker
             float hue = (h % 360) / 360f;
             HslToRgb(hue, 0.65f, 0.50f, out float r, out float g, out float b);
             return new Vector4(r, g, b, alpha);
+        }
+
+        private static bool TryGetOverrideColor(string baseChipName, AuraTrackerSettings s, out Vector4 color)
+        {
+            color = default;
+            if (string.IsNullOrWhiteSpace(baseChipName) || s?.ChipOverrides == null) return false;
+
+            // Case-insensitive exact match on the base chip text (no stacks/timer)
+            foreach (var o in s.ChipOverrides)
+            {
+                if (!string.IsNullOrWhiteSpace(o?.Match) &&
+                    string.Equals(o.Match.Trim(), baseChipName.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    // Use RGB from override; alpha will be applied from BuffBgAlpha to keep consistency
+                    color = new Vector4(o.Color.X, o.Color.Y, o.Color.Z, s.BuffBgAlpha);
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static void HslToRgb(float h, float s, float l, out float r, out float g, out float b)
