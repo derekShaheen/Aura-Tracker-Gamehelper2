@@ -1,4 +1,4 @@
-namespace AuraTracker;
+namespace AuraTracker.util;
 
 internal static class NumberFormatter
 {

@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
+using AuraTracker.util;
 using GameHelper.RemoteObjects;
 using GameHelper.RemoteObjects.Components;
 using GameHelper.RemoteObjects.States.InGameStateObjects;
 using GameHelper.Utils;
 using ImGuiNET;
 
-namespace AuraTracker;
+namespace AuraTracker.controllers;
 
 internal static class BuffVisuals
 {
@@ -48,7 +49,7 @@ internal static class BuffVisuals
 
                 bool timeLeftFinite = !(float.IsNaN(timeLeft) || float.IsInfinity(timeLeft));
                 bool totalFinite = !(float.IsNaN(total) || float.IsInfinity(total));
-                float? duration = (settings.ShowDurations && timeLeftFinite && totalFinite && timeLeft > 0f) ? timeLeft : (float?)null;
+                float? duration = settings.ShowDurations && timeLeftFinite && totalFinite && timeLeft > 0f ? timeLeft : null;
 
                 if (map.TryGetValue(cleaned, out var previous))
                 {
@@ -318,7 +319,7 @@ internal static class BuffVisuals
     private static (string text, float width, float height) FitChip(BuffInfo buff, float rowWidth, AuraTrackerSettings settings)
     {
         string stackSuffix = buff.Stacks > 1 ? $" x{buff.Stacks}" : string.Empty;
-        string durationSuffix = (settings.ShowDurations && buff.DurationSeconds.HasValue) ? $" ({buff.DurationSeconds.Value:0}s)" : string.Empty;
+        string durationSuffix = settings.ShowDurations && buff.DurationSeconds.HasValue ? $" ({buff.DurationSeconds.Value:0}s)" : string.Empty;
         string suffix = stackSuffix + durationSuffix;
 
         string baseName = buff.Name;
@@ -350,7 +351,7 @@ internal static class BuffVisuals
     private static string ComposeDisplay(BuffInfo buff, AuraTrackerSettings settings)
     {
         string stack = buff.Stacks > 1 ? $" x{buff.Stacks}" : string.Empty;
-        string duration = (settings.ShowDurations && buff.DurationSeconds.HasValue) ? $" ({buff.DurationSeconds.Value:0}s)" : string.Empty;
+        string duration = settings.ShowDurations && buff.DurationSeconds.HasValue ? $" ({buff.DurationSeconds.Value:0}s)" : string.Empty;
         return buff.Name + stack + duration;
     }
 
@@ -441,7 +442,7 @@ internal static class BuffVisuals
             hash *= 16777619;
         }
 
-        float hue = (hash % 360) / 360f;
+        float hue = hash % 360 / 360f;
         HslToRgb(hue, 0.65f, 0.50f, out float r, out float g, out float b);
         return new Vector4(r, g, b, alpha);
     }

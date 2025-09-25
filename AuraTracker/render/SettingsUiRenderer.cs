@@ -3,7 +3,7 @@ using System.Numerics;
 using GameHelper.RemoteEnums;
 using ImGuiNET;
 
-namespace AuraTracker;
+namespace AuraTracker.render;
 
 internal sealed class SettingsUiRenderer
 {

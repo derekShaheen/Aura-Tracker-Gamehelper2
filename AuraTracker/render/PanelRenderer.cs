@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using AuraTracker.controllers;
+using AuraTracker.util;
 using GameHelper.RemoteEnums;
 using GameHelper.Utils;
 using ImGuiNET;
 
-namespace AuraTracker;
+namespace AuraTracker.render;
 
 internal sealed class PanelRenderer
 {

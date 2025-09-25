@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using ImGuiNET;
 
-namespace AuraTracker;
+namespace AuraTracker.util;
 
 internal static class ImGuiTextUtil
 {

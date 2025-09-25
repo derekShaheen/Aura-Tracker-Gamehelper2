@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using GameHelper.RemoteObjects.Components;
 
-namespace AuraTracker;
+namespace AuraTracker.controllers;
 
 internal sealed class DpsTracker
 {

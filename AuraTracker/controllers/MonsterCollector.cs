@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
+using AuraTracker.util;
 using GameHelper.RemoteEnums;
 using GameHelper.RemoteEnums.Entity;
 using GameHelper.RemoteObjects;
@@ -11,7 +12,7 @@ using GameHelper.RemoteObjects.Components;
 using GameHelper.RemoteObjects.States;
 using GameHelper.RemoteObjects.States.InGameStateObjects;
 
-namespace AuraTracker;
+namespace AuraTracker.controllers;
 
 internal sealed class MonsterCollector
 {
@@ -174,7 +175,7 @@ internal sealed class MonsterCollector
             }
 
             int slash = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
-            string tail = (slash >= 0) ? path[(slash + 1)..] : path;
+            string tail = slash >= 0 ? path[(slash + 1)..] : path;
 
             int at = tail.IndexOf('@');
             if (at >= 0)

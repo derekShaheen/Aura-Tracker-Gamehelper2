@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using AuraTracker.controllers;
+using AuraTracker.render;
 using Coroutine;
 using GameHelper;
 using GameHelper.CoroutineEvents;
@@ -15,7 +17,7 @@ namespace AuraTracker
 {
     public sealed class AuraTracker : PCore<AuraTrackerSettings>
     {
-        private const string PluginVersion = "1.3.7";
+        private const string PluginVersion = "1.3.7.1";
 
         private readonly DpsTracker dpsTracker = new();
         private readonly MonsterCollector monsterCollector = new();
