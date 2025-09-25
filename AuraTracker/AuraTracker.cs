@@ -7,6 +7,7 @@ using GameHelper;
 using GameHelper.CoroutineEvents;
 using GameHelper.Plugin;
 using GameHelper.RemoteEnums;
+using GameHelper.RemoteObjects.States;
 using GameHelper.RemoteObjects.States.InGameStateObjects;
 using Newtonsoft.Json;
 
@@ -71,7 +72,7 @@ namespace AuraTracker
                 return;
             }
 
-            var inGame = Core.States.InGameStateObject;
+            InGameState inGame = Core.States.InGameStateObject;
             if (!this.Settings.DrawWhenGameInBackground && !Core.Process.Foreground)
             {
                 return;

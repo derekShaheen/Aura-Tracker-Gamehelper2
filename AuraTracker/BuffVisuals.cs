@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using GameHelper.RemoteObjects;
 using GameHelper.RemoteObjects.Components;
+using GameHelper.RemoteObjects.States.InGameStateObjects;
 using GameHelper.Utils;
 using ImGuiNET;
 

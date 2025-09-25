@@ -8,6 +8,7 @@ using GameHelper.RemoteEnums;
 using GameHelper.RemoteEnums.Entity;
 using GameHelper.RemoteObjects;
 using GameHelper.RemoteObjects.Components;
+using GameHelper.RemoteObjects.States;
 using GameHelper.RemoteObjects.States.InGameStateObjects;
 
 namespace AuraTracker;
