@@ -24,6 +24,8 @@ namespace AuraTracker
         private readonly PanelRenderer panelRenderer = new();
         private readonly SettingsUiRenderer settingsRenderer = new(PluginVersion);
         private ActiveCoroutine onAreaChange;
+        private Vector2? defaultLargeMapCenter;
+        private bool isMenuOpen;
 
         private string SettingsPath => Path.Join(this.DllDirectory, "config", "AuraTracker.settings.json");
 
@@ -47,6 +49,8 @@ namespace AuraTracker
             }
 
             this.onAreaChange = CoroutineHandler.Start(OnAreaChange(), string.Empty, 0);
+            this.defaultLargeMapCenter = null;
+            this.isMenuOpen = false;
         }
 
         public override void OnDisable()
@@ -54,6 +58,8 @@ namespace AuraTracker
             this.onAreaChange?.Cancel();
             this.onAreaChange = null;
             this.dpsTracker.Reset();
+            this.defaultLargeMapCenter = null;
+            this.isMenuOpen = false;
         }
 
         public override void SaveSettings()
@@ -85,6 +91,11 @@ namespace AuraTracker
                 return;
             }
 
+            if (this.IsMenuOpen(inGame))
+            {
+                return;
+            }
+
             var overlaySize = new Vector2(Core.Overlay.Size.Width, Core.Overlay.Size.Height);
             var overlayCenter = overlaySize * 0.5f;
 
@@ -103,7 +114,35 @@ namespace AuraTracker
             {
                 yield return new Wait(RemoteEvents.AreaChanged);
                 this.dpsTracker.Reset();
+                this.defaultLargeMapCenter = null;
+                this.isMenuOpen = false;
             }
+        }
+
+        private bool IsMenuOpen(InGameState inGame)
+        {
+            var largeMap = inGame.GameUi.LargeMap;
+            var currentCenter = largeMap.Center;
+
+            if (!this.defaultLargeMapCenter.HasValue)
+            {
+                this.defaultLargeMapCenter = currentCenter;
+                this.isMenuOpen = false;
+                return false;
+            }
+
+            const float menuThreshold = 0.00005f;
+            var delta = Math.Abs(currentCenter.X - this.defaultLargeMapCenter.Value.X);
+
+            if (delta >= menuThreshold)
+            {
+                this.isMenuOpen = true;
+                return true;
+            }
+
+            this.isMenuOpen = false;
+            this.defaultLargeMapCenter = currentCenter;
+            return false;
         }
     }
 }
