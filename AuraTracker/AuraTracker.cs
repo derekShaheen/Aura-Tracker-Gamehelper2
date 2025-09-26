@@ -132,7 +132,7 @@ namespace AuraTracker
             }
 
             const float menuThreshold = 0.00005f;
-            var delta = Math.Abs(currentCenter.Y - this.defaultLargeMapCenter.Value.Y);
+            var delta = Math.Abs(currentCenter.X - this.defaultLargeMapCenter.Value.X);
 
             if (delta >= menuThreshold)
             {
