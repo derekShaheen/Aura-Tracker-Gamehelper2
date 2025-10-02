@@ -8,10 +8,16 @@ internal static class ImGuiTextUtil
 {
     public static Vector2 Measure(string text, float scale)
     {
-        ImGui.SetWindowFontScale(scale);
+        //ImGui.SetWindowFontScale(scale);
         var size = ImGui.CalcTextSize(text);
-        ImGui.SetWindowFontScale(1f);
-        return size;
+        //ImGui.SetWindowFontScale(1f);
+        //return size;
+        if (Math.Abs(scale - 1f) < 0.0001f)
+        {
+            return size;
+        }
+
+        return new Vector2(size.X * scale, size.Y * scale);
     }
 
     public static float MeasureWidth(string text, float scale)
